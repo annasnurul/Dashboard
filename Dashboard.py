@@ -14,7 +14,8 @@ st.title("📊 E-Commerce Performance Dashboard")
 # ======================================
 @st.cache_data
 def load_data():
-    df = pd.read_csv("Main_data.csv")
+    df = pd.read_csv("Main_data.csv", encoding="utf-8-sig")
+    df.columns = df.columns.str.strip()
     return df
 
 df = load_data()
@@ -147,3 +148,4 @@ if "geolocation_lat" in df.columns and "geolocation_lng" in df.columns:
         ).add_to(m)
 
     st_folium(m, width=700)
+
