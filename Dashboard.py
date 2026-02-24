@@ -10,35 +10,19 @@ st.set_page_config(page_title="E-Commerce Dashboard", layout="wide")
 st.title("📊 E-Commerce Performance Dashboard")
 
 # ======================================
-# LOAD DATA
+# LOAD DATA (SATU FILE)
 # ======================================
 @st.cache_data
 def load_data():
-    base = "data/"
+    df = pd.read_csv("Main_data.csv")
+    return df
 
-    orders = pd.read_csv(base+"orders_dataset.csv")
-    items = pd.read_csv(base+"order_items_dataset.csv")
-    customers = pd.read_csv(base+"customers_dataset.csv")
-    products = pd.read_csv(base+"products_dataset.csv")
-    category = pd.read_csv(base+"product_category_name_translation.csv")
-    geo = pd.read_csv(base+"geolocation_dataset.csv")
-
-    return orders, items, customers, products, category, geo
-
-orders, items, customers, products, category, geo = load_data()
+df = load_data()
 
 # ======================================
 # PREPROCESS
 # ======================================
-orders["order_purchase_timestamp"] = pd.to_datetime(
-    orders["order_purchase_timestamp"]
-)
-
-# merge data
-df = orders.merge(items, on="order_id")
-df = df.merge(products, on="product_id")
-df = df.merge(category, on="product_category_name", how="left")
-df = df.merge(customers, on="customer_id")
+df["order_purchase_timestamp"] = pd.to_datetime(df["order_purchase_timestamp"])
 
 # ======================================
 # SIDEBAR FILTER
@@ -146,18 +130,20 @@ rfm.rename(columns={"order_id":"frequency","price":"monetary"}, inplace=True)
 st.dataframe(rfm.sort_values("monetary", ascending=False).head(10))
 
 # ======================================
-# GEOSPATIAL MAP
+# GEOSPATIAL MAP (OPTIONAL)
 # ======================================
-st.subheader("🌍 Peta Distribusi Pelanggan")
+if "geolocation_lat" in df.columns and "geolocation_lng" in df.columns:
+    st.subheader("🌍 Peta Distribusi Pelanggan")
 
-geo_sample = geo.sample(1000)
+    sample = df.sample(1000)
 
-m = folium.Map(location=[-14,-51], zoom_start=4)
+    m = folium.Map(location=[sample["geolocation_lat"].mean(),
+                             sample["geolocation_lng"].mean()], zoom_start=4)
 
-for _, row in geo_sample.iterrows():
-    folium.CircleMarker(
-        [row["geolocation_lat"], row["geolocation_lng"]],
-        radius=2
-    ).add_to(m)
+    for _, row in sample.iterrows():
+        folium.CircleMarker(
+            [row["geolocation_lat"], row["geolocation_lng"]],
+            radius=2
+        ).add_to(m)
 
-st_folium(m, width=700)
+    st_folium(m, width=700)
