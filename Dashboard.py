@@ -116,19 +116,71 @@ st.pyplot(fig)
 # ======================================
 # RFM ANALYSIS
 # ======================================
-st.subheader("⭐ RFM Customer Segmentation")
+# ======================================
+# RFM ANALYSIS (ADVANCED)
+# ======================================
+st.subheader("⭐ RFM Customer Analysis")
 
-rfm = df.groupby("customer_unique_id").agg({
-    "order_purchase_timestamp":"max",
-    "order_id":"nunique",
-    "price":"sum"
-}).reset_index()
+def create_rfm_df(data):
+    rfm = data.groupby("customer_unique_id").agg({
+        "order_purchase_timestamp":"max",
+        "order_id":"nunique",
+        "price":"sum"
+    }).reset_index()
 
-max_date = df["order_purchase_timestamp"].max()
-rfm["recency"] = (max_date - rfm["order_purchase_timestamp"]).dt.days
-rfm.rename(columns={"order_id":"frequency","price":"monetary"}, inplace=True)
+    rfm.columns = ["customer_id","last_order","frequency","monetary"]
 
-st.dataframe(rfm.sort_values("monetary", ascending=False).head(10))
+    max_date = data["order_purchase_timestamp"].max()
+    rfm["recency"] = (max_date - rfm["last_order"]).dt.days
+
+    return rfm
+
+rfm = create_rfm_df(df)
+
+# =====================
+# KPI RFM
+# =====================
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Avg Recency", round(rfm.recency.mean(),1))
+col2.metric("Avg Frequency", round(rfm.frequency.mean(),2))
+col3.metric("Avg Monetary", f"${rfm.monetary.mean():,.0f}")
+
+# =====================
+# VISUALISASI TOP CUSTOMER
+# =====================
+st.subheader("🏆 Top Customers by RFM")
+
+fig, ax = plt.subplots(1,3, figsize=(18,5))
+
+sns.barplot(
+    x="customer_id",
+    y="recency",
+    data=rfm.sort_values("recency").head(5),
+    ax=ax[0]
+)
+ax[0].set_title("Best Recency")
+
+sns.barplot(
+    x="customer_id",
+    y="frequency",
+    data=rfm.sort_values("frequency", ascending=False).head(5),
+    ax=ax[1]
+)
+ax[1].set_title("Highest Frequency")
+
+sns.barplot(
+    x="customer_id",
+    y="monetary",
+    data=rfm.sort_values("monetary", ascending=False).head(5),
+    ax=ax[2]
+)
+ax[2].set_title("Highest Monetary")
+
+for a in ax:
+    a.tick_params(axis='x', rotation=45)
+
+st.pyplot(fig)
 
 # ======================================
 # GEOSPATIAL MAP (OPTIONAL)
