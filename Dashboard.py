@@ -54,31 +54,75 @@ col3.metric("Total Customers", df["customer_unique_id"].nunique())
 # ======================================
 st.subheader("📈 Tren Penjualan")
 
-monthly = df.groupby(
-    df["order_purchase_timestamp"].dt.to_period("M")
-)["order_id"].nunique()
+trend_df = df.copy()
 
-monthly.index = monthly.index.astype(str)
+trend_df = trend_df[
+    (trend_df["order_purchase_timestamp"] >= "2016-09-01") &
+    (trend_df["order_purchase_timestamp"] <= "2018-08-31")
+]
 
-fig, ax = plt.subplots()
-ax.plot(monthly.index, monthly.values, marker="o")
-plt.xticks(rotation=45)
+if "order_status" in trend_df.columns:
+    trend_df = trend_df[trend_df["order_status"] == "delivered"]
+
+trend_df["month_year"] = trend_df["order_purchase_timestamp"].dt.to_period("M")
+
+monthly_orders = (
+    trend_df.groupby("month_year")["order_id"]
+    .nunique()
+    .sort_index()
+)
+
+monthly_orders = monthly_orders[monthly_orders > 0]
+monthly_orders.index = monthly_orders.index.astype(str)
+
+fig, ax = plt.subplots(figsize=(12,5))
+ax.plot(monthly_orders.index, monthly_orders.values, marker="o")
+
+ax.set_title("Tren Penjualan Periode September 2016 – Agustus 2018")
+ax.set_xlabel("Periode (Bulan-Tahun)")
+ax.set_ylabel("Jumlah Order")
+ax.tick_params(axis='x', rotation=45)
+ax.grid(True)
+
 st.pyplot(fig)
 
-# ======================================
-# PRODUK PALING LARIS
-# ======================================
-st.subheader("🔥 Produk Paling Laris")
+# =====================================================
+# 📦 5 KATEGORI PRODUK PALING LARIS
+# =====================================================
+st.subheader("📦 5 Kategori Produk Paling Laris")
 
-top_product = (
+top_products = (
     df.groupby("product_category_name_english")["product_id"]
     .count()
     .sort_values(ascending=False)
-    .head(10)
+    .head(5)
 )
 
-fig, ax = plt.subplots()
-sns.barplot(x=top_product.values, y=top_product.index, ax=ax)
+palette = sns.color_palette("Blues_r", n_colors=5)
+
+fig, ax = plt.subplots(figsize=(12,6))
+
+sns.barplot(
+    x=top_products.values,
+    y=top_products.index,
+    hue=top_products.index,
+    palette=palette,
+    legend=False,
+    ax=ax
+)
+
+ax.patches[0].set_facecolor("#1f77b4")
+
+ax.set_title(
+    "5 Kategori Produk Paling Laris (Berdasarkan Jumlah Terjual)",
+    fontsize=15,
+    weight="bold"
+)
+ax.set_xlabel("Jumlah Terjual")
+ax.set_ylabel("Kategori Produk")
+ax.grid(axis='x', linestyle=':', alpha=0.6)
+
+plt.tight_layout()
 st.pyplot(fig)
 
 # ======================================
@@ -90,11 +134,28 @@ state = (
     df.groupby("customer_state")["customer_id"]
     .nunique()
     .sort_values(ascending=False)
-    .head(10)
+    .head(5)
 )
 
-fig, ax = plt.subplots()
-sns.barplot(x=state.index, y=state.values, ax=ax)
+palette = sns.color_palette("viridis", n_colors=len(state))
+
+fig, ax = plt.subplots(figsize=(10,5))
+
+sns.barplot(
+    x=state.index,
+    y=state.values,
+    hue=state.index,      
+    palette=palette,
+    legend=False,
+    ax=ax
+)
+
+ax.set_title("5 Negara Bagian dengan Jumlah Pelanggan Terbanyak", fontsize=14)
+ax.set_xlabel("Negara Bagian (State)")
+ax.set_ylabel("Jumlah Pelanggan Unik")
+ax.grid(axis='y', linestyle=':', alpha=0.6)
+
+plt.tight_layout()
 st.pyplot(fig)
 
 # ======================================
@@ -109,95 +170,105 @@ rev = (
     .head(10)
 )
 
-fig, ax = plt.subplots()
-sns.barplot(x=rev.values, y=rev.index, ax=ax)
+palette = sns.color_palette("magma", n_colors=len(rev))
+
+fig, ax = plt.subplots(figsize=(10,6))
+
+sns.barplot(
+    x=rev.values,
+    y=rev.index,
+    hue=rev.index,     
+    palette=palette,
+    legend=False,
+    ax=ax
+)
+
+ax.set_title("10 Kategori Produk dengan Revenue Tertinggi", fontsize=14)
+ax.set_xlabel("Total Revenue")
+ax.set_ylabel("Kategori Produk")
+ax.grid(axis='x', linestyle=':', alpha=0.6)
+
+plt.tight_layout()
 st.pyplot(fig)
 
 # ======================================
 # RFM ANALYSIS
 # ======================================
-# ======================================
-# RFM ANALYSIS (ADVANCED)
-# ======================================
 st.subheader("⭐ RFM Customer Analysis")
 
-def create_rfm_df(data):
-    rfm = data.groupby("customer_unique_id").agg({
-        "order_purchase_timestamp":"max",
-        "order_id":"nunique",
-        "price":"sum"
-    }).reset_index()
 
-    rfm.columns = ["customer_id","last_order","frequency","monetary"]
+def create_rfm_dataframe(data):
 
-    max_date = data["order_purchase_timestamp"].max()
-    rfm["recency"] = (max_date - rfm["last_order"]).dt.days
+    rfm = (
+        data.groupby("customer_unique_id", as_index=False)
+        .agg({
+            "order_purchase_timestamp": "max",
+            "order_id": "nunique",
+            "price": "sum"
+        })
+    )
+
+    rfm.rename(columns={
+        "customer_unique_id": "customer_id",
+        "order_purchase_timestamp": "last_order_date",
+        "order_id": "frequency",
+        "price": "monetary"
+    }, inplace=True)
+
+    snapshot_date = data["order_purchase_timestamp"].max() + pd.Timedelta(days=1)
+    rfm["recency"] = (snapshot_date - rfm["last_order_date"]).dt.days
+
+    rfm.drop("last_order_date", axis=1, inplace=True)
 
     return rfm
 
-rfm = create_rfm_df(df)
+rfm_source = load_data()
+rfm_source["order_purchase_timestamp"] = pd.to_datetime(
+    rfm_source["order_purchase_timestamp"]
+)
 
-# =====================
-# KPI RFM
-# =====================
+rfm = create_rfm_dataframe(rfm_source)
+
 col1, col2, col3 = st.columns(3)
 
-col1.metric("Avg Recency", round(rfm.recency.mean(),1))
-col2.metric("Avg Frequency", round(rfm.frequency.mean(),2))
-col3.metric("Avg Monetary", f"${rfm.monetary.mean():,.0f}")
+col1.metric("Average Recency (days)", round(rfm.recency.mean(),1))
+col2.metric("Average Frequency", round(rfm.frequency.mean(),2))
+col3.metric("Average Monetary", f"${rfm.monetary.mean():,.0f}")
 
-# =====================
-# VISUALISASI TOP CUSTOMER
-# =====================
-st.subheader("🏆 Top Customers by RFM")
+st.subheader("🏆 Top Customers Based on RFM Parameters")
 
-fig, ax = plt.subplots(1,3, figsize=(18,5))
+fig, axes = plt.subplots(1,3, figsize=(20,6))
+color_main = "#2E86C1"
 
 sns.barplot(
+    data=rfm.sort_values("recency").head(5),
     x="customer_id",
     y="recency",
-    data=rfm.sort_values("recency").head(5),
-    ax=ax[0]
+    color=color_main,
+    ax=axes[0]
 )
-ax[0].set_title("Best Recency")
+axes[0].set_title("Top 5 Customers by Recency")
 
 sns.barplot(
+    data=rfm.sort_values("frequency", ascending=False).head(5),
     x="customer_id",
     y="frequency",
-    data=rfm.sort_values("frequency", ascending=False).head(5),
-    ax=ax[1]
+    color=color_main,
+    ax=axes[1]
 )
-ax[1].set_title("Highest Frequency")
+axes[1].set_title("Top 5 Customers by Frequency")
 
 sns.barplot(
+    data=rfm.sort_values("monetary", ascending=False).head(5),
     x="customer_id",
     y="monetary",
-    data=rfm.sort_values("monetary", ascending=False).head(5),
-    ax=ax[2]
+    color=color_main,
+    ax=axes[2]
 )
-ax[2].set_title("Highest Monetary")
+axes[2].set_title("Top 5 Customers by Monetary")
 
-for a in ax:
-    a.tick_params(axis='x', rotation=45)
+for ax in axes:
+    ax.tick_params(axis='x', rotation=45)
 
+plt.tight_layout()
 st.pyplot(fig)
-
-# ======================================
-# GEOSPATIAL MAP (OPTIONAL)
-# ======================================
-if "geolocation_lat" in df.columns and "geolocation_lng" in df.columns:
-    st.subheader("🌍 Peta Distribusi Pelanggan")
-
-    sample = df.sample(1000)
-
-    m = folium.Map(location=[sample["geolocation_lat"].mean(),
-                             sample["geolocation_lng"].mean()], zoom_start=4)
-
-    for _, row in sample.iterrows():
-        folium.CircleMarker(
-            [row["geolocation_lat"], row["geolocation_lng"]],
-            radius=2
-        ).add_to(m)
-
-    st_folium(m, width=700)
-
