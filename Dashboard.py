@@ -114,7 +114,7 @@ sns.barplot(
 ax.patches[0].set_facecolor("#1f77b4")
 
 ax.set_title(
-    "5 Kategori Produk Paling Laris (Berdasarkan Jumlah Terjual)",
+    "5 Kategori Produk Paling Laris\n(Periode September 2016 – Agustus 2018)",
     fontsize=15,
     weight="bold"
 )
@@ -150,7 +150,7 @@ sns.barplot(
     ax=ax
 )
 
-ax.set_title("5 Negara Bagian dengan Jumlah Pelanggan Terbanyak", fontsize=14)
+ax.set_title("5 Negara Bagian dengan Jumlah Pelanggan Terbanyak\n(Periode September 2016 – Agustus 2018)", fontsize=14)
 ax.set_xlabel("Negara Bagian (State)")
 ax.set_ylabel("Jumlah Pelanggan Unik")
 ax.grid(axis='y', linestyle=':', alpha=0.6)
@@ -183,7 +183,7 @@ sns.barplot(
     ax=ax
 )
 
-ax.set_title("10 Kategori Produk dengan Revenue Tertinggi", fontsize=14)
+ax.set_title("10 Kategori Produk dengan Revenue Tertinggi\n(Periode September 2016 – Agustus 2018)", fontsize=14)
 ax.set_xlabel("Total Revenue")
 ax.set_ylabel("Kategori Produk")
 ax.grid(axis='x', linestyle=':', alpha=0.6)
